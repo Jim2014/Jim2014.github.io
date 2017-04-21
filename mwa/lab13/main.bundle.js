@@ -31,7 +31,7 @@ module.exports = "<p><label>id:</label> <span>{{stu.id}}</span></p>\n<p><label>n
 /***/ 159:
 /***/ (function(module, exports) {
 
-module.exports = "<ul>\n  <li *ngFor=\"let stu of data\"><a href=\"/profile/{{stu.id}}\">{{stu.name}}</a>\n  </li>\n</ul>\n"
+module.exports = "<ul>\n  <li *ngFor=\"let stu of data\"><a href=\"profile/{{stu.id}}\">{{stu.name}}</a>\n  </li>\n</ul>\n"
 
 /***/ }),
 
@@ -146,7 +146,7 @@ var MyCanActivateGuard = (function () {
         console.log(state);
         var id = parseInt(route.url[1].path);
         if (id <= 0 || id > this.db.getData().length) {
-            this.router.navigate(['/error']);
+            this.router.navigate(['error']);
             return false;
         }
         return true;
@@ -364,7 +364,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 
 var AppComponent = (function () {
     function AppComponent() {
-        this.title = 'Lab13 by Jin Zhou';
+        this.title = 'Lab13';
     }
     return AppComponent;
 }());
@@ -470,7 +470,7 @@ var MY_ROUTES = [
     { path: 'students', component: __WEBPACK_IMPORTED_MODULE_2__students_students_component__["a" /* StudentsComponent */] },
     { path: 'profile/:id', component: __WEBPACK_IMPORTED_MODULE_3__profile_profile_component__["a" /* ProfileComponent */], canActivate: [__WEBPACK_IMPORTED_MODULE_5__guards_mycanactivate_guard__["a" /* MyCanActivateGuard */]], canDeactivate: [__WEBPACK_IMPORTED_MODULE_6__guards_mycandeactivate_guard__["a" /* MyCanDeactivateGuard */]] },
     { path: 'error', component: __WEBPACK_IMPORTED_MODULE_4__error_error_component__["a" /* ErrorComponent */] },
-    { path: '**', redirectTo: '/error' }
+    { path: '**', redirectTo: 'error' }
 ];
 var myRoutes = __WEBPACK_IMPORTED_MODULE_0__angular_router__["b" /* RouterModule */].forRoot(MY_ROUTES);
 //# sourceMappingURL=app.routes.js.map
