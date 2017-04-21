@@ -3,7 +3,7 @@ webpackJsonp([1,4],{
 /***/ 155:
 /***/ (function(module, exports) {
 
-module.exports = "<h1>\n  {{title}}\n</h1>\n<hr>\n <a [routerLink]=\"['']\">Home</a> |\n <a [routerLink]=\"['students']\">students</a> \n <hr>\n <router-outlet></router-outlet>\n\n"
+module.exports = "<h1>\n  {{title}}\n</h1>\n<hr>\n <a [routerLink]=\"['']\">Home</a> |\n <a [routerLink]=\"['#students']\">students</a> \n <hr>\n <router-outlet></router-outlet>\n\n"
 
 /***/ }),
 
@@ -31,7 +31,7 @@ module.exports = "<p><label>id:</label> <span>{{stu.id}}</span></p>\n<p><label>n
 /***/ 159:
 /***/ (function(module, exports) {
 
-module.exports = "<ul>\n  <li *ngFor=\"let stu of data\"><a routerLink = \"/profile/{{stu.id}}\">{{stu.name}}</a>\n  </li>\n</ul>\n"
+module.exports = "<ul>\n  <li *ngFor=\"let stu of data\"><a routerLink = \"/#profile/{{stu.id}}\">{{stu.name}}</a>\n  </li>\n</ul>\n"
 
 /***/ }),
 
@@ -146,7 +146,7 @@ var MyCanActivateGuard = (function () {
         console.log(state);
         var id = parseInt(route.url[1].path);
         if (id <= 0 || id > this.db.getData().length) {
-            this.router.navigate(['error']);
+            this.router.navigate(['#error']);
             return false;
         }
         return true;
@@ -465,12 +465,12 @@ AppModule = __decorate([
 
 
 var MY_ROUTES = [
+    { path: '#home', component: __WEBPACK_IMPORTED_MODULE_1__home_home_component__["a" /* HomeComponent */] },
+    { path: '#students', component: __WEBPACK_IMPORTED_MODULE_2__students_students_component__["a" /* StudentsComponent */] },
+    { path: '#profile/:id', component: __WEBPACK_IMPORTED_MODULE_3__profile_profile_component__["a" /* ProfileComponent */], canActivate: [__WEBPACK_IMPORTED_MODULE_5__guards_mycanactivate_guard__["a" /* MyCanActivateGuard */]], canDeactivate: [__WEBPACK_IMPORTED_MODULE_6__guards_mycandeactivate_guard__["a" /* MyCanDeactivateGuard */]] },
+    { path: '#error', component: __WEBPACK_IMPORTED_MODULE_4__error_error_component__["a" /* ErrorComponent */] },
+    { path: '#*', redirectTo: '#error' },
     { path: '', component: __WEBPACK_IMPORTED_MODULE_1__home_home_component__["a" /* HomeComponent */] },
-    { path: 'home', component: __WEBPACK_IMPORTED_MODULE_1__home_home_component__["a" /* HomeComponent */] },
-    { path: 'students', component: __WEBPACK_IMPORTED_MODULE_2__students_students_component__["a" /* StudentsComponent */] },
-    { path: 'profile/:id', component: __WEBPACK_IMPORTED_MODULE_3__profile_profile_component__["a" /* ProfileComponent */], canActivate: [__WEBPACK_IMPORTED_MODULE_5__guards_mycanactivate_guard__["a" /* MyCanActivateGuard */]], canDeactivate: [__WEBPACK_IMPORTED_MODULE_6__guards_mycandeactivate_guard__["a" /* MyCanDeactivateGuard */]] },
-    { path: 'error', component: __WEBPACK_IMPORTED_MODULE_4__error_error_component__["a" /* ErrorComponent */] },
-    { path: '**', redirectTo: 'error' }
 ];
 var myRoutes = __WEBPACK_IMPORTED_MODULE_0__angular_router__["b" /* RouterModule */].forRoot(MY_ROUTES);
 //# sourceMappingURL=app.routes.js.map
