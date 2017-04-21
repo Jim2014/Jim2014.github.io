@@ -31,7 +31,7 @@ module.exports = "<p><label>id:</label> <span>{{stu.id}}</span></p>\n<p><label>n
 /***/ 159:
 /***/ (function(module, exports) {
 
-module.exports = "<ul>\n  <li *ngFor=\"let stu of data\"><a href=\"profile/{{stu.id}}\">{{stu.name}}</a>\n  </li>\n</ul>\n"
+module.exports = "<ul>\n  <li *ngFor=\"let stu of data\"><a routerLink = \"/profile/{{stu.id}}\">{{stu.name}}</a>\n  </li>\n</ul>\n"
 
 /***/ }),
 
