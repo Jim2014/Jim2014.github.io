@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>UserProfile</title>
+  <base href="/Jim2014.github.io/mwa/bikeride/callback/">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <script>
+      if (navigator.geolocation) {          
+          navigator.geolocation.getCurrentPosition(function (position) {
+          window.curUserPositon = { lat: position.coords.latitude, long: position.coords.longitude };
+        })};
+  </script>
+<link href="styles.93005ae41ae32640a19c.bundle.css" rel="stylesheet"/></head>
+
+<body>
+  <app-root>Loading...</app-root>
+<script type="text/javascript" src="inline.a78593e0a5c21320a92d.bundle.js"></script><script type="text/javascript" src="polyfills.dfab4e14bb24a53e77bd.bundle.js"></script><script type="text/javascript" src="scripts.7fc4460fd55e9f61bb4d.bundle.js"></script><script type="text/javascript" src="vendor.d069f828397e01be2efd.bundle.js"></script><script type="text/javascript" src="main.ac354ba9acfd66a53784.bundle.js"></script></body>
+
+
+<script>
+  var liveRidesMap;
+  function initMap() {
+    var mapElement = document.getElementById('map');
+    if (!mapElement)
+      return;
+    if (!window.ridesPositons || window.ridesPositons.length == 0)
+      return;
+    liveRidesMap = new google.maps.Map(mapElement, {
+      zoom: 12,
+      center: { lat: window.ridesPositons[0].lat, lng: window.ridesPositons[0].lng }
+    });
+  }
+  ShowLiveRidesMap();
+  function ShowLiveRidesMap() {
+    var markers = [];
+
+    setInterval(intervalFunc, 1000);
+
+    function intervalFunc() {
+      if (!liveRidesMap) initMap();
+      if (!window.ridesPositons || window.ridesPositons.length == 0)
+        return;
+      clearMarkers();
+      for (var i = 0; i < window.ridesPositons.length; i++) {
+        addMarker(window.ridesPositons[i]);
+      }
+    }
+    
+      function addMarker(position) {
+        markers.push(new google.maps.Marker({
+          position: position,
+          map: liveRidesMap,
+          title: position.title
+        }));
+      }
+
+      function clearMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+          markers[i].setMap(null);
+        }
+        markers = [];
+      }
+    };
+  
+ </script>
+ <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCgQZB1ebGaBuUrgmkPaj-SxdkHm_TXtx8&callback=initMap">
+ </script>
+
+
+</html>
