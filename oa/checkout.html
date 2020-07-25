@@ -15,15 +15,15 @@
             webCheckoutDetails: {
                 checkoutReviewReturnUrl: 'https://www.wfm.com/oa/checkoutReview.html'
             },
-            storeId: 'amzn1.application-oa2-client.6eacd9659912488e86964aa6d51b5aa5'
+            storeId: 'amzn1.application-oa2-client.a063c33f8adf40d9b9ddba1ac35fe9e5'
         };
 
-        var signature = `Nme+Z0eI61KmSFsfw+tY+yVwCl/RaeOQs6oBNG0y5u7PsRQwUSE8gHtGUDnN7ZrqlAf9bkc62ZUSAeW9+LMGosiSAimAMBbZOlCm87FfaP7oNT1L5rriOSRAbT3npVUKcTPydzz3N9hIT272eu4a3gXvtlguKiwSVZPrd6sl0U3S5Q4VK+CxCigobNVhsyzUc0UhfZF1PJ/bjCXzQ17xMAaZdrKwFiTw4HI26GqwAOAYGG7JBDjfOa8IRbYGraaYSug1Z18rdmqrZmuqinw/pNRexgz+a4WQTO+rirf1yEj7UVPebgVjOLHYV9susIPehbPCVVRIrrbvOMcyClhuSw==`;
+        var signature = `ZJ/WULIGO4rh32xJ1qHVktUDSs7aAP140DVahoVXaFEk1O6LTbpfzAoY/6LcM6yD4ciDeojEfl01A9Vd+qDmW3IvGfX9a9EcRKlZvFJiKNq6A1Yp+RBZArHfEXN85z5OhQR1uklbw2r1m3El5Q8JEOPQVa09FvVLwE2qmN5DoE9mFHqWplG9QmH5y4jFa17lt+fDPXJAe6t6lcUgCYabuGsbVk3l1P7nk5tjLPdq6b7c77TrC4b2ig/RXAKc+MovWzxSGy1ltvqbzS4hpBhC4K51CXeoiLSza46YzzDtrSpekAOlBjAaGUz5ro736qxrqMEsh5hbwrmOvIMVcdunJw==`;
         amazon.Pay.renderButton('#AmazonPayButton', {
             // set checkout environment
-            merchantId: 'A3M8LMA1BHSCTT',
+            merchantId: 'A2FDUJRDSVONTE',
             ledgerCurrency: 'USD',
-            sandbox: true,               
+            sandbox: false,               
             // customize the buyer experience
             checkoutLanguage: 'en_US',
             productType: 'PayAndShip',
@@ -33,7 +33,7 @@
             createCheckoutSessionConfig: {                     
                 payloadJSON: JSON.stringify(payload), // string generated in step 2
                 signature: signature, // signature generated in step 3
-                publicKeyId: 'AGXZAK72PJNCVRT4CJ72KWAH' 
+                publicKeyId: 'AFNTUFCJ5W7XGIWQZLFMIXNK' 
             }   
         });
     </script>
