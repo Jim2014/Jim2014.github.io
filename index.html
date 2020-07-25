@@ -1,6 +1,42 @@
-#test by jim for the site!
-<h1>head 1</h1>
-big title
-=============
-middle title
--------------
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Amazon Pay PIC</title>
+  <meta name="description" content="The HTML5 Herald">
+  <meta name="author" content="SitePoint">
+</head>
+
+<body>
+    <div id="AmazonPayButton"></div>
+    <script src="https://static-na.payments-amazon.com/checkout.js"></script>
+    <script type="text/javascript" charset="utf-8">
+        var payload = {
+            webCheckoutDetails: {
+                checkoutReviewReturnUrl: 'https://www.wfm.com/oa/checkoutReview.html'
+            },
+            storeId: 'amzn1.application-oa2-client.6eacd9659912488e86964aa6d51b5aa5'
+        };
+
+        var signature = `Nme+Z0eI61KmSFsfw+tY+yVwCl/RaeOQs6oBNG0y5u7PsRQwUSE8gHtGUDnN7ZrqlAf9bkc62ZUSAeW9+LMGosiSAimAMBbZOlCm87FfaP7oNT1L5rriOSRAbT3npVUKcTPydzz3N9hIT272eu4a3gXvtlguKiwSVZPrd6sl0U3S5Q4VK+CxCigobNVhsyzUc0UhfZF1PJ/bjCXzQ17xMAaZdrKwFiTw4HI26GqwAOAYGG7JBDjfOa8IRbYGraaYSug1Z18rdmqrZmuqinw/pNRexgz+a4WQTO+rirf1yEj7UVPebgVjOLHYV9susIPehbPCVVRIrrbvOMcyClhuSw==`;
+        amazon.Pay.renderButton('#AmazonPayButton', {
+            // set checkout environment
+            merchantId: 'A3M8LMA1BHSCTT',
+            ledgerCurrency: 'USD',
+            sandbox: true,               
+            // customize the buyer experience
+            checkoutLanguage: 'en_US',
+            productType: 'PayAndShip',
+            placement: 'Cart',
+            buttonColor: 'Gold',
+            // configure Create Checkout Session request
+            createCheckoutSessionConfig: {                     
+                payloadJSON: JSON.stringify(payload), // string generated in step 2
+                signature: signature, // signature generated in step 3
+                publicKeyId: 'AGXZAK72PJNCVRT4CJ72KWAH' 
+            }   
+        });
+    </script>
+</body>
+
+</html>
