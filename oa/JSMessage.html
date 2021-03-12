@@ -1,0 +1,13 @@
+<html>
+      <head></head>
+      <body>
+        <script>
+          function post() {
+            window.postMessage("Message Info")
+            document.getElementById("info").innerHTML = "Message Info";
+          }
+        </script>
+        <button onclick="post()">Post Message</button>
+        <p id="info"></p>
+      </body>
+      </html>
