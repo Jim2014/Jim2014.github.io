@@ -1,0 +1,149 @@
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #ccc;
+}
+
+/* Style the cells to be square */
+td {
+    width: 12.5%; /* Adjust the cell size as desired (100% / 8 columns) */
+    position: relative;
+    user-select: none;
+  }
+  
+  td::before {
+    content: "";
+    display: block;
+    padding-bottom: 100%; /* Maintain the aspect ratio */
+  }
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: 600px;
+    height: 600px;
+    border: 2px solid #000;
+}
+
+.cell {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+}
+
+.piece {
+    font-size: 40px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.white {
+    color: #fff;
+}
+
+.black {
+    color: #000;
+}
+
+.light {
+    background-color: #f0d9b5;
+}
+
+.dark {
+    background-color: #b58863;
+}
+
+.selected-piece {
+    box-shadow: 0 0 10px 5px rgba(255, 255, 0, 0.5);
+}
+
+.possible-move {
+    position: relative;
+  }
+  
+  .possible-move::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 50%; /* Adjust the circle size as needed */
+    height: 50%; /* Adjust the circle size as needed */
+    background-color: rgba(0, 255, 0, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .game-container {
+    display: flex; /* Use flex layout to position the board and info area side by side */
+  }
+  
+  /* Add styling for the info area */
+  #info-area {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    height: 500px;
+    width: 200px;
+    margin-left: 20px;
+    background-color: #f0d9b5;
+    border-radius: 5px;
+    padding: 10px;
+    box-sizing: border-box;
+  }
+
+ /* Style board cells to create rows */
+#board {
+    width: 500px; /* Adjust the board size as desired */
+    height: 500px; /* Adjust the board size as desired */
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+  }
+
+  #undo-button {
+    display: block;
+    margin: 10px auto;
+    padding: 8px 16px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #333;
+    background-color: #f1f1f1;
+    border: 2px solid #ccc;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+  
+  #undo-button:hover {
+    background-color: #e1e1e1;
+  }
+
+
+  #move-list {
+    flex: 1;
+    overflow-y: auto;
+    width: 100%;
+    margin: 10px 0;
+    max-height: calc(100% - 90px);
+  }
+  
+  #move-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  .move-list::-webkit-scrollbar-track {
+    background: #f0d9b5;
+  }
+  
+  #move-list::-webkit-scrollbar-thumb {
+    background-color: #b58863;
+    border-radius: 3px;
+  }
