@@ -21,7 +21,14 @@ const initialPosition = [
   function createBoard() {
     board.addEventListener("click", onBoardClick);
     for (let i = 0; i < 8; i++) {
+      
       for (let j = 0; j < 8; j++) {
+        if(j==0) {
+          let cell = document.createElement("div");
+          cell.className = "cell";
+          cell.innerHTML = 8-i
+          board.appendChild(cell);
+        }
         let cell = document.createElement("div");
         cell.className = "cell";
         cell.classList.add((i + j) % 2 === 0 ? "light" : "dark");
@@ -36,6 +43,14 @@ const initialPosition = [
           pieceElement.dataset.type = piece.toLowerCase();
           pieceElement.dataset.color = isLowerCase(piece) ? "white" : "black";
           cell.appendChild(pieceElement);
+        }
+        board.appendChild(cell);
+      }
+      for (let j = 0; i==7 && j <= 8; j++) {
+        let cell = document.createElement("div");
+        cell.className = "cell";
+        if(j > 0) {
+          cell.innerHTML = String.fromCharCode('a'.charCodeAt(0) + j-1);
         }
         board.appendChild(cell);
       }
