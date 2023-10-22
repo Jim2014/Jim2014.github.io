@@ -105,8 +105,8 @@ td {
     width: 500px; /* Adjust the board size as desired */
     height: 500px; /* Adjust the board size as desired */
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(8, 1fr);
+    grid-template-columns: repeat(9, 1fr);
+    grid-template-rows: repeat(9, 1fr);
   }
 
   #undo-button {
