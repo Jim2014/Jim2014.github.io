@@ -156,11 +156,18 @@ td {
   }
 
   #board, #info-area {
-    margin: 10px 0; /* Add some vertical spacing */
+    margin: 0; /* Add some vertical spacing */
+    width: 350px; /* Adjust the board size as desired */
+    height: 350px;
   }
 
   #info-area {
     width: 90%; /* Make the info area take up most of the screen width */
-    height: auto; /* Let it determine its own height based on content */
+    height: 300px; /* Let it determine its own height based on content */
+    margin-top: 16px;
+  }
+
+  .piece {
+    font-size: 30px;
   }
 }
