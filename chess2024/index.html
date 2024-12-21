@@ -1,1 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chess (All Features + Responsive Layout)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    /* A flex container that can wrap for responsive layout */
+    .chess-container {
+      display: flex;
+      flex-wrap: wrap; /* allow wrapping to next line if space is constrained */
+      align-items: flex-start;
+    }
+    /* Left panel: holds board, status, etc. */
+    .left-panel {
+      margin-right: 20px;  /* space to the right for the right-panel on wide screens */
+      flex: 1 1 auto;      /* board can flex/grow */
+      min-width: 320px;    /* set a min width for the board area */
+    }
+    /* Right panel: Undo/Redo buttons + move history */
+    .right-panel {
+      display: flex;
+      flex-direction: column; 
+      min-width: 220px;   /* a comfortable minimum width */
+      flex: 0 0 auto;     /* don't force expansion */
+    }
+    /*
+      When the screen is narrow (e.g. <= 700px),
+      stack the panels vertically: board on top, controls/history below.
+    */
+    @media (max-width: 700px) {
+      .chess-container {
+        flex-direction: column; /* stack vertically */
+      }
+      .left-panel {
+        margin-right: 0; /* remove horizontal spacing */
+      }
+      .right-panel {
+        margin-top: 20px; /* some vertical spacing instead */
+        min-width: auto;  /* let it shrink if needed */
+      }
+    }
+
+    /* Title and status text */
+    h1 {
+      margin: 0 0 5px 0;
+    }
+    #status {
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    /* Chessboard styling */
+    .chessboard {
+      border: 2px solid #333;
+      width: fit-content;
+      margin-bottom: 10px;
+    }
+    .row {
+      display: flex;
+    }
+    .cell {
+      width: 60px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      cursor: pointer;
+    }
+    /* Light and dark squares */
+    .cell.light {
+      background-color: #f0d9b5;
+    }
+    .cell.dark {
+      background-color: #b58863;
+    }
+
+    /* Highlighting for selected piece */
+    .selected {
+      outline: 3px solid yellow;
+    }
+    /* Highlight possible moves */
+    .highlight {
+      box-shadow: inset 0 0 0 3px rgba(0, 255, 0, 0.7);
+    }
+    /* Distinguishable text color for White/Black pieces */
+    .white-piece {
+      color: #fff;
+    }
+    .black-piece {
+      color: #000;
+    }
+
+    /* Controls & Move History */
+    .controls {
+      margin-bottom: 10px;
+    }
+    button {
+      margin-right: 5px;
+    }
+    #moveHistory {
+      height: 200px;
+      border: 1px solid #aaa;
+      overflow-y: auto;
+      padding: 5px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="chess-container">
+  <!-- Left: Title, status, board -->
+  <div class="left-panel">
+    <h1>Chess (Responsive)</h1>
+    <div id="status">White's Turn</div>
+    <div class="chessboard" id="chessboard"></div>
+  </div>
+
+  <!-- Right: Controls + Move History -->
+  <div class="right-panel">
+    <div class="controls">
+      <button id="undoBtn">Undo</button>
+      <button id="redoBtn">Redo</button>
+    </div>
+    <div id="moveHistory"></div>
+  </div>
+</div>
+
+<script>
+/**
+ * Complete Chess with:
+ *   - 2-player turn-taking
+ *   - Check & Checkmate
+ *   - Stalemate
+ *   - Draw by Insufficient Material (Naive)
+ *   - Castling (kingside/queenside)
+ *   - Pawn Promotion (auto-promote to queen)
+ *   - En Passant
+ *   - Undo/Redo & Move History
+ *   - Responsive layout for both wide and narrow screens
+ *
+ * This code preserves all prior logic (~800 lines in earlier versions), 
+ * now wrapped with a responsive layout so that on narrow screens, 
+ * the move history & controls appear below the board.
+ */
+
+/** Board: 8x8 array, black pieces on rows 0..1, white pieces on rows 6..7. */
+let board = [
+  ["r","n","b","q","k","b","n","r"],
+  ["p","p","p","p","p","p","p","p"],
+  [null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null],
+  [null,null,null,null,null,null,null,null],
+  ["P","P","P","P","P","P","P","P"],
+  ["R","N","B","Q","K","B","N","R"]
+];
+
+// Track which player's turn (white or black)
+let currentPlayer = 'white';
+// When true, game is done (checkmate, stalemate, or insufficient material)
+let gameOver = false;
+
+// For selecting/moving pieces
+let selectedCell = null; // [row, col]
+let possibleMoves = [];  // array of move objects
+
+// Undo/Redo
+let moveHistoryStack = [];
+let redoStack = [];
+
+// Castling trackers: whether King/Rook have moved
+let whiteKingMoved = false;
+let blackKingMoved = false;
+let whiteRookA_Moved = false; // a1
+let whiteRookH_Moved = false; // h1
+let blackRookA_Moved = false; // a8
+let blackRookH_Moved = false; // h8
+
+// For En Passant: store last move if it was a double-step pawn move
+let lastMove = null;
+
+// DOM references
+const boardContainer = document.getElementById('chessboard');
+const statusEl = document.getElementById('status');
+const moveHistoryEl = document.getElementById('moveHistory');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+/** Build the board UI cells */
+function createBoardUI() {
+  boardContainer.innerHTML = "";
+  for (let r=0; r<8; r++) {
+    const rowDiv = document.createElement('div');
+    rowDiv.classList.add('row');
+    for (let c=0; c<8; c++) {
+      const cell = document.createElement('div');
+      cell.classList.add('cell', (r+c)%2===0 ? 'light' : 'dark');
+      cell.setAttribute('data-row', r);
+      cell.setAttribute('data-col', c);
+      cell.addEventListener('click', onCellClick);
+      rowDiv.appendChild(cell);
+    }
+    boardContainer.appendChild(rowDiv);
+  }
+  updateBoardUI();
+}
+
+/** On cell click: either select a piece or attempt a move */
+function onCellClick(e) {
+  if(gameOver) return;
+
+  const cell = e.currentTarget;
+  const row = +cell.getAttribute('data-row');
+  const col = +cell.getAttribute('data-col');
+  const piece = board[row][col];
+
+  if(selectedCell) {
+    // We already have a piece selected. Check if (row,col) is in possibleMoves
+    const [selRow, selCol] = selectedCell;
+    const chosenMove = possibleMoves.find(m => m.row===row && m.col===col);
+    if(chosenMove) {
+      // Save current state for undo
+      pushToHistory({
+        board: copyBoard(board),
+        move: coordsToSquare(selRow, selCol)+" to "+coordsToSquare(row, col),
+        whiteKingMoved, blackKingMoved,
+        whiteRookA_Moved, whiteRookH_Moved,
+        blackRookA_Moved, blackRookH_Moved,
+        lastMove: lastMove ? {...lastMove} : null
+      });
+      // Clear redo
+      redoStack = [];
+
+      // Execute the move (castling/enPassant/normal)
+      if(chosenMove.castling) {
+        doCastlingMove(selRow, selCol, row, col, chosenMove.castlingRookFrom, chosenMove.castlingRookTo);
+      }
+      else if(chosenMove.enPassant) {
+        doEnPassantMove(selRow, selCol, row, col, chosenMove.captureRow, chosenMove.captureCol);
+      }
+      else {
+        // Normal
+        board[row][col] = board[selRow][selCol];
+        board[selRow][selCol] = null;
+        updateKingRookMoved(selRow, selCol, row, col);
+      }
+
+      // Pawn promotion?
+      maybePromotePawn(row, col);
+
+      // Record lastMove for en passant
+      lastMove = {
+        fromRow: selRow, fromCol: selCol,
+        toRow: row, toCol: col,
+        piece: board[row][col]
+      };
+
+      // Log move
+      logMove(coordsToSquare(selRow, selCol)+" to "+coordsToSquare(row, col));
+
+      // Switch turn and check for check/mate/stalemate/draw
+      switchPlayer();
+      checkCheckAndMate();
+    }
+
+    // Clear selection no matter what
+    selectedCell = null;
+    possibleMoves = [];
+    updateBoardUI();
+  } else {
+    // No piece selected yet => try to select if it's the current player's piece
+    if(!piece) return; // clicked empty cell
+    if(
+      (currentPlayer==='white' && isWhitePiece(piece)) ||
+      (currentPlayer==='black' && isBlackPiece(piece))
+    ) {
+      selectedCell = [row, col];
+      possibleMoves = getValidMoves(row, col, piece, board);
+      updateBoardUI();
+    }
+  }
+}
+
+/** Switch the current player (unless gameOver). */
+function switchPlayer() {
+  currentPlayer = (currentPlayer==='white') ? 'black' : 'white';
+  if(!gameOver) {
+    statusEl.textContent = (currentPlayer==='white') ? "White's Turn" : "Black's Turn";
+  }
+}
+
+/** After a move, check if we have checkmate, stalemate, or insufficient material. */
+function checkCheckAndMate() {
+  if(gameOver) return;
+  const color = currentPlayer;
+  const inCheck = isKingInCheck(board, color);
+
+  // See if there's ANY legal move for 'color'
+  let hasMove = false;
+  for(let r=0; r<8; r++){
+    for(let c=0; c<8; c++){
+      const p = board[r][c];
+      if(!p) continue;
+      if((color==='white' && isWhitePiece(p)) ||
+         (color==='black' && isBlackPiece(p))) {
+        const moves = getValidMoves(r, c, p, board);
+        if(moves.length>0) {
+          hasMove = true;
+          break;
+        }
+      }
+    }
+    if(hasMove) break;
+  }
+
+  if(inCheck) {
+    if(!hasMove) {
+      // Checkmate
+      gameOver = true;
+      statusEl.textContent = (color==='white')
+        ? "Checkmate! White's king is captured. Black wins!"
+        : "Checkmate! Black's king is captured. White wins!";
+    } else {
+      statusEl.textContent = (color==='white')
+        ? "White's Turn - Check!"
+        : "Black's Turn - Check!";
+    }
+  } else {
+    // Not in check => if no move => stalemate
+    if(!hasMove) {
+      gameOver = true;
+      statusEl.textContent = "Stalemate! Draw!";
+    }
+    else {
+      // Possibly insufficient material
+      if(checkInsufficientMaterial(board)) {
+        gameOver = true;
+        statusEl.textContent = "Draw by insufficient material!";
+      }
+    }
+  }
+}
+
+/** Check if there's insufficient material for any side to force mate. (Naive approach) */
+function checkInsufficientMaterial(bd) {
+  let whiteMinorCount = 0, blackMinorCount = 0;
+  let whiteHeavyCount = 0, blackHeavyCount = 0;
+
+  for(let r=0; r<8; r++){
+    for(let c=0; c<8; c++){
+      const piece = bd[r][c];
+      if(!piece) continue;
+      if(isWhitePiece(piece)) {
+        if(piece==='Q' || piece==='R' || piece==='P') {
+          whiteHeavyCount++;
+        } else if(piece==='B' || piece==='N') {
+          whiteMinorCount++;
+        }
+      } else {
+        if(piece==='q' || piece==='r' || piece==='p') {
+          blackHeavyCount++;
+        } else if(piece==='b' || piece==='n') {
+          blackMinorCount++;
+        }
+      }
+    }
+  }
+
+  // If either side has a queen/rook/pawn => not insufficient
+  if(whiteHeavyCount>0 || blackHeavyCount>0) return false;
+  // If either side has >1 minor piece => might still mate
+  if(whiteMinorCount>1 || blackMinorCount>1) return false;
+
+  // e.g. K vs K, K+B vs K, K+N vs K, K+N vs K+N => draw
+  return true;
+}
+
+/** If a pawn reaches last rank, promote to queen automatically. */
+function maybePromotePawn(row, col) {
+  const piece = board[row][col];
+  if(!piece) return;
+  if(piece==='P' && row===0) {
+    board[row][col] = 'Q';
+  }
+  else if(piece==='p' && row===7) {
+    board[row][col] = 'q';
+  }
+}
+
+/** If the move is a king/rook move, mark them as moved (to disable castling). */
+function updateKingRookMoved(fromRow, fromCol, toRow, toCol) {
+  const piece = board[toRow][toCol];
+  if(piece==='K') {
+    whiteKingMoved = true;
+  }
+  else if(piece==='k') {
+    blackKingMoved = true;
+  }
+  else if(piece==='R') {
+    if(fromRow===7 && fromCol===0) whiteRookA_Moved = true;
+    if(fromRow===7 && fromCol===7) whiteRookH_Moved = true;
+  }
+  else if(piece==='r') {
+    if(fromRow===0 && fromCol===0) blackRookA_Moved = true;
+    if(fromRow===0 && fromCol===7) blackRookH_Moved = true;
+  }
+}
+
+/** Castling move: move both king and rook. */
+function doCastlingMove(kingRow, kingCol, kingDestRow, kingDestCol, rookFrom, rookTo) {
+  // Move king
+  board[kingDestRow][kingDestCol] = board[kingRow][kingCol];
+  board[kingRow][kingCol] = null;
+  // Move rook
+  board[rookTo.row][rookTo.col] = board[rookFrom.row][rookFrom.col];
+  board[rookFrom.row][rookFrom.col] = null;
+
+  // Mark them as moved
+  const movedPiece = board[kingDestRow][kingDestCol];
+  if(movedPiece==='K') whiteKingMoved = true;
+  if(movedPiece==='k') blackKingMoved = true;
+
+  const rookPiece = board[rookTo.row][rookTo.col];
+  if(rookPiece==='R') {
+    if(rookFrom.row===7 && rookFrom.col===0) whiteRookA_Moved=true;
+    if(rookFrom.row===7 && rookFrom.col===7) whiteRookH_Moved=true;
+  }
+  if(rookPiece==='r') {
+    if(rookFrom.row===0 && rookFrom.col===0) blackRookA_Moved=true;
+    if(rookFrom.row===0 && rookFrom.col===7) blackRookH_Moved=true;
+  }
+}
+
+/** En passant: move capturing pawn, remove captured pawn. */
+function doEnPassantMove(fromRow, fromCol, toRow, toCol, capRow, capCol) {
+  board[toRow][toCol] = board[fromRow][fromCol];
+  board[fromRow][fromCol] = null;
+  board[capRow][capCol] = null;
+  // en passant is always a pawn, so no castling flags needed.
+}
+
+/** Generate all fully legal moves for a piece at (row,col). */
+function getValidMoves(row, col, piece, bd) {
+  // 1) gather pseudo-legal moves
+  let pseudo = getPseudoLegalMoves(row, col, piece, bd);
+
+  // 2) if king not moved, add castling
+  if((piece==='K' && !whiteKingMoved) || (piece==='k' && !blackKingMoved)) {
+    pseudo = pseudo.concat(getCastlingMoves(row, col, piece, bd));
+  }
+
+  // 3) if pawn, add en passant
+  if(piece.toLowerCase()==='p') {
+    pseudo = pseudo.concat(getEnPassantMoves(row, col, piece, bd));
+  }
+
+  // 4) filter out moves leaving own king in check
+  const color = isWhitePiece(piece)? 'white':'black';
+  const valid = [];
+  for(const mv of pseudo) {
+    const tmp = copyBoard(bd);
+    if(mv.castling) {
+      // castling
+      tmp[mv.row][mv.col] = tmp[row][col]; // king
+      tmp[row][col] = null;
+      tmp[mv.castlingRookTo.row][mv.castlingRookTo.col] = 
+        tmp[mv.castlingRookFrom.row][mv.castlingRookFrom.col];
+      tmp[mv.castlingRookFrom.row][mv.castlingRookFrom.col] = null;
+    }
+    else if(mv.enPassant) {
+      tmp[mv.row][mv.col] = tmp[row][col];
+      tmp[row][col] = null;
+      tmp[mv.captureRow][mv.captureCol] = null;
+    }
+    else {
+      // normal
+      tmp[mv.row][mv.col] = tmp[row][col];
+      tmp[row][col] = null;
+    }
+    if(!isKingInCheck(tmp, color)) {
+      valid.push(mv);
+    }
+  }
+  return valid;
+}
+
+/** Return pseudo-legal moves ignoring check but excluding castling/en-passant. */
+function getPseudoLegalMoves(row, col, piece, bd) {
+  let moves = [];
+  const directionsRook = [[-1,0],[1,0],[0,-1],[0,1]];
+  const directionsBishop = [[-1,-1],[-1,1],[1,-1],[1,1]];
+
+  function addMoveIfValid(r,c) {
+    if(r<0||r>7||c<0||c>7) return false;
+    const target = bd[r][c];
+    if(!target) {
+      moves.push({row:r,col:c});
+      return true;
+    } else {
+      // capture if opposite color
+      if((isWhitePiece(piece) && isBlackPiece(target)) ||
+         (isBlackPiece(piece) && isWhitePiece(target))) {
+        moves.push({row:r,col:c});
+      }
+      return false;
+    }
+  }
+
+  switch(piece.toLowerCase()) {
+    case 'p': {
+      // White => row-1, Black => row+1
+      const forward = isWhitePiece(piece)? -1 : +1;
+      const startRow = isWhitePiece(piece)? 6:1;
+      if(row===startRow) {
+        // can move 1 or 2 squares
+        if(!bd[row+forward][col]) {
+          moves.push({row: row+forward, col});
+          if(!bd[row+2*forward][col]) {
+            moves.push({row: row+2*forward, col});
+          }
+        }
+      } else {
+        const one = row+forward;
+        if(one>=0&&one<8 && !bd[one][col]) {
+          moves.push({row:one,col});
+        }
+      }
+      // capture diagonals
+      const capLeft = [row+forward, col-1];
+      const capRight= [row+forward, col+1];
+      [capLeft, capRight].forEach(([rr,cc])=>{
+        if(rr>=0&&rr<8 && cc>=0&&cc<8) {
+          const target = bd[rr][cc];
+          if(target && (
+            (isWhitePiece(piece)&& isBlackPiece(target)) ||
+            (isBlackPiece(piece)&& isWhitePiece(target))
+          )) {
+            moves.push({row:rr,col:cc});
+          }
+        }
+      });
+      break;
+    }
+    case 'r': {
+      directionsRook.forEach(([dr,dc])=>{
+        let rr=row, cc=col;
+        while(true){
+          rr += dr; cc += dc;
+          if(!addMoveIfValid(rr,cc)) break;
+        }
+      });
+      break;
+    }
+    case 'n': {
+      const offsets = [
+        [-2,-1],[-2,1],[2,-1],[2,1],
+        [-1,-2],[-1,2],[1,-2],[1,2]
+      ];
+      offsets.forEach(([dr,dc])=>{
+        const rr = row+dr, cc = col+dc;
+        if(rr>=0&&rr<8 && cc>=0&&cc<8) {
+          const target = bd[rr][cc];
+          if(!target || (isWhitePiece(piece)&&isBlackPiece(target))||
+             (isBlackPiece(piece)&&isWhitePiece(target))) {
+            moves.push({row:rr,col:cc});
+          }
+        }
+      });
+      break;
+    }
+    case 'b': {
+      directionsBishop.forEach(([dr,dc])=>{
+        let rr=row, cc=col;
+        while(true){
+          rr+=dr; cc+=dc;
+          if(!addMoveIfValid(rr,cc)) break;
+        }
+      });
+      break;
+    }
+    case 'q': {
+      const directionsQueen = directionsRook.concat(directionsBishop);
+      directionsQueen.forEach(([dr,dc])=>{
+        let rr=row, cc=col;
+        while(true){
+          rr+=dr; cc+=dc;
+          if(!addMoveIfValid(rr,cc)) break;
+        }
+      });
+      break;
+    }
+    case 'k': {
+      // 1 step in any direction
+      const kingDirs = directionsRook.concat(directionsBishop);
+      kingDirs.forEach(([dr,dc])=>{
+        const rr = row+dr, cc=col+dc;
+        addMoveIfValid(rr,cc);
+      });
+      break;
+    }
+  }
+  return moves;
+}
+
+/** Return castling moves if king hasn't moved and conditions are met. */
+function getCastlingMoves(row, col, piece, bd) {
+  const moves = [];
+  if(isKingInCheck(bd, isWhitePiece(piece)? 'white':'black')) {
+    return moves; // can't castle if currently in check
+  }
+
+  const color = isWhitePiece(piece)? 'white':'black';
+  if(color==='white') {
+    if(!whiteKingMoved) {
+      // short => rook at (7,7), squares (7,5),(7,6)
+      if(!whiteRookH_Moved) {
+        if(!bd[7][5] && !bd[7][6]) {
+          if(!squareUnderAttack(bd,7,5,'black') &&
+             !squareUnderAttack(bd,7,6,'black')) {
+            moves.push({
+              row:7,col:6,
+              castling:true,
+              castlingRookFrom:{row:7,col:7},
+              castlingRookTo:{row:7,col:5}
+            });
+          }
+        }
+      }
+      // long => rook at (7,0), squares (7,1),(7,2),(7,3)
+      if(!whiteRookA_Moved) {
+        if(!bd[7][1] && !bd[7][2] && !bd[7][3]) {
+          if(!squareUnderAttack(bd,7,1,'black') &&
+             !squareUnderAttack(bd,7,2,'black') &&
+             !squareUnderAttack(bd,7,3,'black')) {
+            moves.push({
+              row:7,col:2,
+              castling:true,
+              castlingRookFrom:{row:7,col:0},
+              castlingRookTo:{row:7,col:3}
+            });
+          }
+        }
+      }
+    }
+  } else {
+    // black
+    if(!blackKingMoved) {
+      // short => rook at (0,7)
+      if(!blackRookH_Moved) {
+        if(!bd[0][5] && !bd[0][6]) {
+          if(!squareUnderAttack(bd,0,5,'white') &&
+             !squareUnderAttack(bd,0,6,'white')) {
+            moves.push({
+              row:0,col:6,
+              castling:true,
+              castlingRookFrom:{row:0,col:7},
+              castlingRookTo:{row:0,col:5}
+            });
+          }
+        }
+      }
+      // long => rook at (0,0)
+      if(!blackRookA_Moved) {
+        if(!bd[0][1] && !bd[0][2] && !bd[0][3]) {
+          if(!squareUnderAttack(bd,0,1,'white') &&
+             !squareUnderAttack(bd,0,2,'white') &&
+             !squareUnderAttack(bd,0,3,'white')) {
+            moves.push({
+              row:0,col:2,
+              castling:true,
+              castlingRookFrom:{row:0,col:0},
+              castlingRookTo:{row:0,col:3}
+            });
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+/** Return en passant moves if last move was a double-step pawn by the opponent. */
+function getEnPassantMoves(row, col, piece, bd) {
+  const moves = [];
+  if(!lastMove) return moves;
+
+  // lastMove must be a 2-step pawn
+  const lastPiece = lastMove.piece;
+  if(!lastPiece || lastPiece.toLowerCase()!=='p') return moves;
+  const oppColor = isWhitePiece(lastPiece)? 'white':'black';
+  const myColor = isWhitePiece(piece)? 'white':'black';
+  if(oppColor===myColor) return moves; // must be opponent's pawn
+
+  const diff = Math.abs(lastMove.fromRow - lastMove.toRow);
+  if(diff!==2) return moves; // not a double-step
+
+  // final position
+  const fRow = lastMove.toRow, fCol = lastMove.toCol;
+
+  // if we're white, black pawn ended on row=3 (from row=1)
+  if(myColor==='white') {
+    if(row===3 && fRow===3 && Math.abs(col-fCol)===1) {
+      // can capture en passant => move to row=2, remove black pawn at (3,fCol)
+      moves.push({
+        row:2,col:fCol,
+        enPassant:true,
+        captureRow:3,
+        captureCol:fCol
+      });
+    }
+  } else {
+    // black
+    if(row===4 && fRow===4 && Math.abs(col-fCol)===1) {
+      moves.push({
+        row:5,col:fCol,
+        enPassant:true,
+        captureRow:4,
+        captureCol:fCol
+      });
+    }
+  }
+
+  return moves;
+}
+
+/** Return true if 'opponentColor' can capture square (r,c) in bd. */
+function squareUnderAttack(bd, r, c, opponentColor) {
+  for(let rr=0; rr<8; rr++){
+    for(let cc=0; cc<8; cc++){
+      const p = bd[rr][cc];
+      if(!p) continue;
+      if(opponentColor==='white' && isWhitePiece(p)) {
+        const pseudo = getPseudoLegalMoves(rr, cc, p, bd);
+        if(pseudo.some(m=>m.row===r && m.col===c)) {
+          return true;
+        }
+      }
+      else if(opponentColor==='black' && isBlackPiece(p)) {
+        const pseudo = getPseudoLegalMoves(rr, cc, p, bd);
+        if(pseudo.some(m=>m.row===r && m.col===c)) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/** Return true if the 'color' side's king is in check. */
+function isKingInCheck(bd, color) {
+  const kingChar = (color==='white')? 'K':'k';
+  let kingPos = null;
+  for(let r=0; r<8; r++){
+    for(let c=0; c<8; c++){
+      if(bd[r][c]===kingChar){
+        kingPos = [r,c];
+        break;
+      }
+    }
+    if(kingPos) break;
+  }
+  if(!kingPos) return false; // no king found?
+  const oppColor = (color==='white')? 'black':'white';
+  return squareUnderAttack(bd, kingPos[0], kingPos[1], oppColor);
+}
+
+/** Update all cell UI states: piece text, highlights, etc. */
+function updateBoardUI() {
+  const cells = boardContainer.querySelectorAll('.cell');
+  cells.forEach(cell => {
+    cell.classList.remove('selected','highlight','white-piece','black-piece');
+    const r = +cell.getAttribute('data-row');
+    const c = +cell.getAttribute('data-col');
+    const piece = board[r][c];
+    cell.textContent = piece ? pieceToUnicode(piece) : "";
+
+    // color
+    if(piece) {
+      if(isWhitePiece(piece)) cell.classList.add('white-piece');
+      else cell.classList.add('black-piece');
+    }
+    // highlight if selected
+    if(selectedCell && selectedCell[0]===r && selectedCell[1]===c) {
+      cell.classList.add('selected');
+    }
+    // highlight possible moves
+    if(possibleMoves.some(m=>m.row===r && m.col===c)) {
+      cell.classList.add('highlight');
+    }
+  });
+}
+
+/** Convert piece notation to Unicode symbol */
+function pieceToUnicode(piece) {
+  switch(piece) {
+    // White
+    case 'R': return '♖'; case 'N': return '♘'; case 'B': return '♗';
+    case 'Q': return '♕'; case 'K': return '♔'; case 'P': return '♙';
+    // Black
+    case 'r': return '♜'; case 'n': return '♞'; case 'b': return '♝';
+    case 'q': return '♛'; case 'k': return '♚'; case 'p': return '♟';
+    default: return piece;
+  }
+}
+
+/** Check piece color */
+function isWhitePiece(piece) {
+  return (/[RNBQKP]/).test(piece);
+}
+function isBlackPiece(piece) {
+  return (/[rnbqkp]/).test(piece);
+}
+
+/** Convert (row,col) -> algebraic notation: (7,0)-> a1, (0,0)-> a8 */
+function coordsToSquare(r,c) {
+  const file = String.fromCharCode('a'.charCodeAt(0)+ c);
+  const rank = 8 - r;
+  return file + rank;
+}
+
+/** Create a copy of the board array (for undo/redo) */
+function copyBoard(bd) {
+  return bd.map(row => row.slice());
+}
+
+/** Move History Logging */
+function logMove(txt) {
+  const p = document.createElement('p');
+  p.textContent = txt;
+  moveHistoryEl.appendChild(p);
+  moveHistoryEl.scrollTop = moveHistoryEl.scrollHeight;
+}
+
+/** Push a snapshot (board + extra data) to the moveHistory stack */
+function pushToHistory(snapshot) {
+  moveHistoryStack.push(snapshot);
+}
+
+/** Remove last line from the move log panel */
+function removeLastMoveHistory() {
+  const lines = moveHistoryEl.getElementsByTagName('p');
+  if(lines.length>0) {
+    moveHistoryEl.removeChild(lines[lines.length-1]);
+  }
+}
+
+/** Undo: restore from previous snapshot */
+function undoMove() {
+  if(moveHistoryStack.length>0) {
+    if(gameOver) gameOver=false;
+
+    // current snapshot
+    const currentSnapshot = {
+      board: copyBoard(board),
+      move: null,
+      whiteKingMoved, blackKingMoved,
+      whiteRookA_Moved, whiteRookH_Moved,
+      blackRookA_Moved, blackRookH_Moved,
+      lastMove: lastMove ? {...lastMove} : null
+    };
+    // pop from history
+    const prev = moveHistoryStack.pop();
+    // push current to redo
+    redoStack.push(currentSnapshot);
+
+    // restore
+    board = prev.board;
+    whiteKingMoved = prev.whiteKingMoved;
+    blackKingMoved = prev.blackKingMoved;
+    whiteRookA_Moved = prev.whiteRookA_Moved;
+    whiteRookH_Moved = prev.whiteRookH_Moved;
+    blackRookA_Moved = prev.blackRookA_Moved;
+    blackRookH_Moved = prev.blackRookH_Moved;
+    lastMove = prev.lastMove ? {...prev.lastMove} : null;
+
+    removeLastMoveHistory();
+    // revert turn
+    switchPlayer();
+    createBoardUI();
+  }
+}
+
+/** Redo: re-apply a move that was undone */
+function redoMove() {
+  if(redoStack.length>0 && !gameOver) {
+    const snapshot = redoStack.pop();
+    pushToHistory({
+      board: copyBoard(board),
+      move: snapshot.move,
+      whiteKingMoved, blackKingMoved,
+      whiteRookA_Moved, whiteRookH_Moved,
+      blackRookA_Moved, blackRookH_Moved,
+      lastMove: lastMove ? {...lastMove} : null
+    });
+
+    board = snapshot.board;
+    whiteKingMoved = snapshot.whiteKingMoved;
+    blackKingMoved = snapshot.blackKingMoved;
+    whiteRookA_Moved = snapshot.whiteRookA_Moved;
+    whiteRookH_Moved = snapshot.whiteRookH_Moved;
+    blackRookA_Moved = snapshot.blackRookA_Moved;
+    blackRookH_Moved = snapshot.blackRookH_Moved;
+    lastMove = snapshot.lastMove ? {...snapshot.lastMove} : null;
+
+    if(snapshot.move) {
+      logMove(snapshot.move);
+    }
+    switchPlayer();
+    createBoardUI();
+    checkCheckAndMate();
+  }
+}
+
+// Attach button events
+undoBtn.addEventListener('click', undoMove);
+redoBtn.addEventListener('click', redoMove);
+
+// Initialize
+createBoardUI();
+</script>
+</body>
+</html>
 
