@@ -425,15 +425,11 @@
             });
         }
 
-        // Function to append status messages to the last move
-        function appendStatusToLastMove(message) {
+        // Function to set status messages to the last move
+        function setStatusToLastMove(message) {
             if(moveHistory.length === 0) return;
             const lastMove = moveHistory[moveHistory.length -1];
-            if(!lastMove.status) {
-                lastMove.status = message;
-            } else {
-                lastMove.status += ' | ' + message;
-            }
+            lastMove.status = message;
             // Update the last list item
             historyList.lastChild.innerHTML = `${lastMove.notation} <span class="status">(${lastMove.status})</span>`;
         }
@@ -845,8 +841,8 @@
 
             renderBoard();
 
-            // Check game state
-            checkGameState();
+            // Ensure that checkGameState runs after the DOM has updated
+            requestAnimationFrame(checkGameState);
         }
 
         // Get algebraic notation
@@ -895,8 +891,8 @@
                 // Reset selection and pending promotion
                 pendingPromotionMove = null;
 
-                // Check game state
-                checkGameState();
+                // Ensure that checkGameState runs after the DOM has updated
+                requestAnimationFrame(checkGameState);
             });
         });
 
@@ -947,8 +943,8 @@
             updateTurnIndicator();
             renderBoard();
 
-            // Log status after undo
-            checkGameState();
+            // Ensure that checkGameState runs after the DOM has updated
+            requestAnimationFrame(checkGameState);
         });
 
         // Redo move
@@ -991,8 +987,8 @@
             updateTurnIndicator();
             renderBoard();
 
-            // Log status after redo
-            checkGameState();
+            // Ensure that checkGameState runs after the DOM has updated
+            requestAnimationFrame(checkGameState);
         });
 
         // New Game button
@@ -1004,7 +1000,7 @@
         function checkGameState() {
             // Check for insufficient material
             if(isInsufficientMaterial()) {
-                appendStatusToLastMove('Stalemate by insufficient material! The game is a draw.');
+                setStatusToLastMove('Stalemate by insufficient material! The game is a draw.');
                 gameOver = true;
                 return;
             }
@@ -1012,7 +1008,7 @@
             const color = currentTurn;
             const kingPos = findKing(board, color);
             if(!kingPos) {
-                appendStatusToLastMove(`${color === 'w' ? 'Black' : 'White'} wins by checkmate!`);
+                setStatusToLastMove(`${color === 'w' ? 'Black' : 'White'} wins by checkmate!`);
                 gameOver = true;
                 return;
             }
@@ -1023,11 +1019,11 @@
                 // Check if checkmate
                 const hasMoves = hasAnyMoves(color);
                 if(!hasMoves) {
-                    appendStatusToLastMove(`${color === 'w' ? 'White' : 'Black'} is in checkmate. ${color === 'w' ? 'Black' : 'White'} wins!`);
+                    setStatusToLastMove(`${color === 'w' ? 'White' : 'Black'} is in checkmate. ${color === 'w' ? 'Black' : 'White'} wins!`);
                     gameOver = true;
                     return;
                 } else {
-                    appendStatusToLastMove(`${color === 'w' ? 'White' : 'Black'} is in check!`);
+                    setStatusToLastMove(`${color === 'w' ? 'White' : 'Black'} is in check!`);
                 }
             } else {
                 // Remove any existing king-in-check highlights
@@ -1035,22 +1031,18 @@
                 // Check for stalemate
                 const hasMoves = hasAnyMoves(color);
                 if(!hasMoves) {
-                    appendStatusToLastMove('Stalemate! The game is a draw.');
+                    setStatusToLastMove('Stalemate! The game is a draw.');
                     gameOver = true;
                     return;
                 }
             }
         }
 
-        // Append status message to the last move
-        function appendStatusToLastMove(message) {
+        // Function to set status messages to the last move
+        function setStatusToLastMove(message) {
             if(moveHistory.length === 0) return;
             const lastMove = moveHistory[moveHistory.length -1];
-            if(!lastMove.status) {
-                lastMove.status = message;
-            } else {
-                lastMove.status += ' | ' + message;
-            }
+            lastMove.status = message;
             // Update the last list item
             historyList.lastChild.innerHTML = `${lastMove.notation} <span class="status">(${lastMove.status})</span>`;
         }
@@ -1058,15 +1050,24 @@
         // Highlight the king in check
         function highlightKingInCheck(color) {
             const king = color === 'w' ? 'K' : 'k';
+            let found = false;
             for(let r=0; r<8; r++) {
                 for(let c=0; c<8; c++) {
                     if(board[r][c] === king) {
                         const selector = `.square[data-row='${r}'][data-col='${c}']`;
                         const square = document.querySelector(selector);
-                        if(square) square.classList.add('king-in-check');
-                        return;
+                        if(square) {
+                            square.classList.add('king-in-check');
+                            console.log(`King in check at row: ${r}, col: ${c}`); // Debug log
+                            found = true;
+                        }
+                        break;
                     }
                 }
+                if(found) break;
+            }
+            if(!found) {
+                console.warn(`King not found for color: ${color}`); // Debug log
             }
         }
 
