@@ -102,6 +102,25 @@
             box-sizing: border-box;
             z-index: 1;
         }
+        /* King in Check Highlighting */
+        .square.king-in-check::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 0, 0, 0.5); /* Semi-transparent red */
+            pointer-events: none;
+            border: 3px solid red; /* Solid red border */
+            box-sizing: border-box;
+            z-index: 3;
+        }
+        /* Status Message Styling */
+        .status {
+            font-style: italic;
+            color: #ffdddd; /* Light red color for visibility */
+        }
         /* Sidebar styling */
         #sidebar {
             margin-left: 20px;
@@ -269,7 +288,7 @@
         let selected = null;
         let validMoves = [];
         let currentTurn = 'w';
-        let moveHistory = [];
+        let moveHistory = []; // Array of move objects
         let undoneMoves = [];
         let enPassantTarget = null; // {row, col}
         let castlingRights = {
@@ -388,6 +407,8 @@
                 sq.classList.remove('selected');
                 sq.classList.remove('highlight');
             });
+            // Remove king-in-check highlight
+            removeKingHighlight();
         }
 
         // Highlight a specific square
@@ -402,6 +423,19 @@
             moves.forEach(move => {
                 highlightSquare(move.to.row, move.to.col, 'highlight');
             });
+        }
+
+        // Function to append status messages to the last move
+        function appendStatusToLastMove(message) {
+            if(moveHistory.length === 0) return;
+            const lastMove = moveHistory[moveHistory.length -1];
+            if(!lastMove.status) {
+                lastMove.status = message;
+            } else {
+                lastMove.status += ' | ' + message;
+            }
+            // Update the last list item
+            historyList.lastChild.innerHTML = `${lastMove.notation} <span class="status">(${lastMove.status})</span>`;
         }
 
         // Get valid moves for a piece
@@ -727,7 +761,8 @@
                 castling: null,
                 enPassant: null,
                 promotion: null,
-                notation: null
+                notation: null,
+                status: null // To store status messages like check, checkmate, etc.
             };
 
             // Handle special moves
@@ -823,7 +858,10 @@
 
         // Update move history
         function updateMoveHistory(notation) {
-            historyList.innerHTML += `<li>${notation}</li>`;
+            const moveIndex = moveHistory.length; // Current move count
+            const li = document.createElement('li');
+            li.innerHTML = notation;
+            historyList.appendChild(li);
         }
 
         // Handle promotion choice
@@ -846,7 +884,8 @@
                 // Update the last move in history with promotion
                 promo.notation += ` promotion to ${piece}`;
                 moveHistory[moveHistory.length -1] = promo;
-                historyList.lastChild.textContent = promo.notation;
+                // Update the last list item
+                historyList.lastChild.innerHTML = `${promo.notation}`;
 
                 // Switch turn
                 currentTurn = currentTurn === 'w' ? 'b' : 'w';
@@ -907,6 +946,9 @@
             currentTurn = currentTurn === 'w' ? 'b' : 'w';
             updateTurnIndicator();
             renderBoard();
+
+            // Log status after undo
+            checkGameState();
         });
 
         // Redo move
@@ -914,7 +956,7 @@
             if(undoneMoves.length === 0) return;
             const move = undoneMoves.pop();
             moveHistory.push(move);
-            historyList.innerHTML += `<li>${move.notation}</li>`;
+            updateMoveHistory(move.notation);
 
             // Reapply the move
             board[move.from.row][move.from.col] = '';
@@ -948,6 +990,9 @@
             currentTurn = currentTurn === 'w' ? 'b' : 'w';
             updateTurnIndicator();
             renderBoard();
+
+            // Log status after redo
+            checkGameState();
         });
 
         // New Game button
@@ -959,7 +1004,7 @@
         function checkGameState() {
             // Check for insufficient material
             if(isInsufficientMaterial()) {
-                alert('Stalemate by insufficient material! The game is a draw.');
+                appendStatusToLastMove('Stalemate by insufficient material! The game is a draw.');
                 gameOver = true;
                 return;
             }
@@ -967,546 +1012,69 @@
             const color = currentTurn;
             const kingPos = findKing(board, color);
             if(!kingPos) {
-                alert((color === 'w' ? 'Black' : 'White') + ' wins by checkmate!');
+                appendStatusToLastMove(`${color === 'w' ? 'Black' : 'White'} wins by checkmate!`);
                 gameOver = true;
                 return;
             }
             const inCheck = isSquareAttacked(board, kingPos.row, kingPos.col, color === 'w' ? 'b' : 'w');
             if(inCheck) {
+                // Highlight the king in red
+                highlightKingInCheck(color);
                 // Check if checkmate
                 const hasMoves = hasAnyMoves(color);
                 if(!hasMoves) {
-                    alert((color === 'w' ? 'White' : 'Black') + ' is in checkmate. ' + (color === 'w' ? 'Black' : 'White') + ' wins!');
+                    appendStatusToLastMove(`${color === 'w' ? 'White' : 'Black'} is in checkmate. ${color === 'w' ? 'Black' : 'White'} wins!`);
                     gameOver = true;
                     return;
                 } else {
-                    alert((color === 'w' ? 'White' : 'Black') + ' is in check!');
+                    appendStatusToLastMove(`${color === 'w' ? 'White' : 'Black'} is in check!`);
                 }
             } else {
+                // Remove any existing king-in-check highlights
+                removeKingHighlight();
                 // Check for stalemate
                 const hasMoves = hasAnyMoves(color);
                 if(!hasMoves) {
-                    alert('Stalemate! The game is a draw.');
+                    appendStatusToLastMove('Stalemate! The game is a draw.');
                     gameOver = true;
                     return;
                 }
             }
         }
 
-        // Check if player has any valid moves
-        function hasAnyMoves(color) {
-            for(let r=0; r<8; r++) {
-                for(let c=0; c<8; c++) {
-                    const piece = board[r][c];
-                    if(piece && getPieceColor(piece) === color) {
-                        const moves = getValidMoves(r, c);
-                        if(moves.length > 0) return true;
-                    }
-                }
-            }
-            return false;
-        }
-
-        // Reset game
-        function resetGame() {
-            board = JSON.parse(JSON.stringify(initialBoard));
-            moveHistory = [];
-            undoneMoves = [];
-            historyList.innerHTML = '';
-            currentTurn = 'w';
-            enPassantTarget = null;
-            castlingRights = {
-                'wK': true,
-                'wQ': true,
-                'wR1': true,
-                'wR2': true,
-                'bK': true,
-                'bQ': true,
-                'bR1': true,
-                'bR2': true
-            };
-            pendingPromotionMove = null;
-            gameOver = false;
-            updateTurnIndicator();
-            renderBoard();
-        }
-
-        // Check for insufficient material (stalemate)
-        function isInsufficientMaterial() {
-            const piecesOnBoard = [];
-            for(let r=0; r<8; r++) {
-                for(let c=0; c<8; c++) {
-                    const piece = board[r][c];
-                    if(piece) piecesOnBoard.push(piece.toUpperCase());
-                }
-            }
-
-            // Remove kings
-            const nonKingPieces = piecesOnBoard.filter(p => p !== 'K');
-
-            // No pieces besides kings
-            if(nonKingPieces.length === 0) return true;
-
-            // Only bishops or knights besides kings
-            const allowed = ['B', 'N'];
-            if(nonKingPieces.every(p => allowed.includes(p))) {
-                // Count number of bishops and knights
-                let bishops = 0;
-                let knights = 0;
-                nonKingPieces.forEach(p => {
-                    if(p === 'B') bishops++;
-                    if(p === 'N') knights++;
-                });
-                // King vs King + Bishop
-                if(nonKingPieces.length === 1 && bishops === 1) return true;
-                // King vs King + Knight
-                if(nonKingPieces.length === 1 && knights === 1) return true;
-                // King and Bishop vs King and Bishop with bishops on same color
-                if(nonKingPieces.length === 2 && bishops === 2) {
-                    // Find the squares of the bishops
-                    let bishopSquares = [];
-                    for(let r=0; r<8; r++) {
-                        for(let c=0; c<8; c++) {
-                            const piece = board[r][c];
-                            if(piece && piece.toUpperCase() === 'B') {
-                                bishopSquares.push({row: r, col: c});
-                            }
-                        }
-                    }
-                    if(bishopSquares.length === 2) {
-                        const bishop1Color = (bishopSquares[0].row + bishopSquares[0].col) % 2;
-                        const bishop2Color = (bishopSquares[1].row + bishopSquares[1].col) % 2;
-                        if(bishop1Color === bishop2Color) return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        // Handle promotion choice
-        document.querySelectorAll('.promotion-piece').forEach(button => {
-            button.addEventListener('click', function() {
-                if(!pendingPromotionMove) return; // Safety check
-                const piece = button.dataset.piece;
-                const promo = pendingPromotionMove;
-                const color = getPieceColor(promo.piece);
-                let newPiece = '';
-                switch(piece) {
-                    case 'Q': newPiece = color === 'w' ? 'Q' : 'q'; break;
-                    case 'R': newPiece = color === 'w' ? 'R' : 'r'; break;
-                    case 'B': newPiece = color === 'w' ? 'B' : 'b'; break;
-                    case 'N': newPiece = color === 'w' ? 'N' : 'n'; break;
-                }
-                board[promo.to.row][promo.to.col] = newPiece;
-                promotionModal.style.display = 'none';
-
-                // Update the last move in history with promotion
-                promo.notation += ` promotion to ${piece}`;
-                moveHistory[moveHistory.length -1] = promo;
-                historyList.lastChild.textContent = promo.notation;
-
-                // Switch turn
-                currentTurn = currentTurn === 'w' ? 'b' : 'w';
-                updateTurnIndicator();
-                renderBoard();
-
-                // Reset selection and pending promotion
-                pendingPromotionMove = null;
-
-                // Check game state
-                checkGameState();
-            });
-        });
-
-        // Undo move
-        undoBtn.addEventListener('click', function() {
+        // Append status message to the last move
+        function appendStatusToLastMove(message) {
             if(moveHistory.length === 0) return;
-            const lastMove = moveHistory.pop();
-            undoneMoves.push(lastMove);
-            historyList.removeChild(historyList.lastChild);
-
-            // Revert the move
-            if(lastMove.promotion) {
-                board[lastMove.to.row][lastMove.to.col] = 'P';
+            const lastMove = moveHistory[moveHistory.length -1];
+            if(!lastMove.status) {
+                lastMove.status = message;
             } else {
-                board[lastMove.from.row][lastMove.from.col] = lastMove.piece;
-                board[lastMove.to.row][lastMove.to.col] = lastMove.captured;
+                lastMove.status += ' | ' + message;
             }
-
-            // Handle special moves
-            if(lastMove.special === 'en-passant') {
-                const capturedRow = currentTurn === 'w' ? lastMove.to.row + 1 : lastMove.to.row - 1;
-                board[capturedRow][lastMove.to.col] = 'p'; // Assuming captured piece was pawn
-            }
-            if(lastMove.special === 'castling') {
-                if(lastMove.castling === 'kingside') {
-                    const rookFromCol = 5;
-                    const rookToCol = 7;
-                    board[lastMove.to.row][rookToCol] = board[lastMove.to.row][rookFromCol];
-                    board[lastMove.to.row][rookFromCol] = 'R';
-                } else if(lastMove.castling === 'queenside') {
-                    const rookFromCol = 3;
-                    const rookToCol = 0;
-                    board[lastMove.to.row][rookToCol] = board[lastMove.to.row][rookFromCol];
-                    board[lastMove.to.row][rookFromCol] = 'R';
-                }
-            }
-            if(lastMove.special === 'double-pawn-move') {
-                enPassantTarget = {row: (lastMove.from.row + lastMove.to.row) / 2, col: lastMove.to.col};
-            } else {
-                enPassantTarget = null;
-            }
-
-            // Restore castling rights if necessary
-            // Note: This implementation does not track castling rights history. For full functionality, additional tracking is needed.
-
-            // Switch turn back
-            currentTurn = currentTurn === 'w' ? 'b' : 'w';
-            updateTurnIndicator();
-            renderBoard();
-        });
-
-        // Redo move
-        redoBtn.addEventListener('click', function() {
-            if(undoneMoves.length === 0) return;
-            const move = undoneMoves.pop();
-            moveHistory.push(move);
-            historyList.innerHTML += `<li>${move.notation}</li>`;
-
-            // Reapply the move
-            board[move.from.row][move.from.col] = '';
-            board[move.to.row][move.to.col] = move.piece;
-
-            // Handle special moves
-            if(move.special === 'en-passant') {
-                const capturedRow = currentTurn === 'w' ? move.to.row + 1 : move.to.row - 1;
-                board[capturedRow][move.to.col] = '';
-            }
-            if(move.special === 'castling') {
-                if(move.castling === 'kingside') {
-                    const rookFromCol = 7;
-                    const rookToCol = 5;
-                    board[move.to.row][rookToCol] = board[move.to.row][rookFromCol];
-                    board[move.to.row][rookFromCol] = '';
-                } else if(move.castling === 'queenside') {
-                    const rookFromCol = 0;
-                    const rookToCol = 3;
-                    board[move.to.row][rookToCol] = board[move.to.row][rookFromCol];
-                    board[move.to.row][rookFromCol] = '';
-                }
-            }
-            if(move.special === 'double-pawn-move') {
-                enPassantTarget = {row: (move.from.row + move.to.row) / 2, col: move.to.col};
-            } else {
-                enPassantTarget = null;
-            }
-
-            // Switch turn forward
-            currentTurn = currentTurn === 'w' ? 'b' : 'w';
-            updateTurnIndicator();
-            renderBoard();
-        });
-
-        // New Game button
-        newGameBtn.addEventListener('click', function() {
-            resetGame();
-        });
-
-        // Check game state
-        function checkGameState() {
-            // Check for insufficient material
-            if(isInsufficientMaterial()) {
-                alert('Stalemate by insufficient material! The game is a draw.');
-                gameOver = true;
-                return;
-            }
-
-            const color = currentTurn;
-            const kingPos = findKing(board, color);
-            if(!kingPos) {
-                alert((color === 'w' ? 'Black' : 'White') + ' wins by checkmate!');
-                gameOver = true;
-                return;
-            }
-            const inCheck = isSquareAttacked(board, kingPos.row, kingPos.col, color === 'w' ? 'b' : 'w');
-            if(inCheck) {
-                // Check if checkmate
-                const hasMoves = hasAnyMoves(color);
-                if(!hasMoves) {
-                    alert((color === 'w' ? 'White' : 'Black') + ' is in checkmate. ' + (color === 'w' ? 'Black' : 'White') + ' wins!');
-                    gameOver = true;
-                    return;
-                } else {
-                    alert((color === 'w' ? 'White' : 'Black') + ' is in check!');
-                }
-            } else {
-                // Check for stalemate
-                const hasMoves = hasAnyMoves(color);
-                if(!hasMoves) {
-                    alert('Stalemate! The game is a draw.');
-                    gameOver = true;
-                    return;
-                }
-            }
+            // Update the last list item
+            historyList.lastChild.innerHTML = `${lastMove.notation} <span class="status">(${lastMove.status})</span>`;
         }
 
-        // Check if player has any valid moves
-        function hasAnyMoves(color) {
+        // Highlight the king in check
+        function highlightKingInCheck(color) {
+            const king = color === 'w' ? 'K' : 'k';
             for(let r=0; r<8; r++) {
                 for(let c=0; c<8; c++) {
-                    const piece = board[r][c];
-                    if(piece && getPieceColor(piece) === color) {
-                        const moves = getValidMoves(r, c);
-                        if(moves.length > 0) return true;
+                    if(board[r][c] === king) {
+                        const selector = `.square[data-row='${r}'][data-col='${c}']`;
+                        const square = document.querySelector(selector);
+                        if(square) square.classList.add('king-in-check');
+                        return;
                     }
                 }
             }
-            return false;
         }
 
-        // Reset game
-        function resetGame() {
-            board = JSON.parse(JSON.stringify(initialBoard));
-            moveHistory = [];
-            undoneMoves = [];
-            historyList.innerHTML = '';
-            currentTurn = 'w';
-            enPassantTarget = null;
-            castlingRights = {
-                'wK': true,
-                'wQ': true,
-                'wR1': true,
-                'wR2': true,
-                'bK': true,
-                'bQ': true,
-                'bR1': true,
-                'bR2': true
-            };
-            pendingPromotionMove = null;
-            gameOver = false;
-            updateTurnIndicator();
-            renderBoard();
-        }
-
-        // Check for insufficient material (stalemate)
-        function isInsufficientMaterial() {
-            const piecesOnBoard = [];
-            for(let r=0; r<8; r++) {
-                for(let c=0; c<8; c++) {
-                    const piece = board[r][c];
-                    if(piece) piecesOnBoard.push(piece.toUpperCase());
-                }
-            }
-
-            // Remove kings
-            const nonKingPieces = piecesOnBoard.filter(p => p !== 'K');
-
-            // No pieces besides kings
-            if(nonKingPieces.length === 0) return true;
-
-            // Only bishops or knights besides kings
-            const allowed = ['B', 'N'];
-            if(nonKingPieces.every(p => allowed.includes(p))) {
-                // Count number of bishops and knights
-                let bishops = 0;
-                let knights = 0;
-                nonKingPieces.forEach(p => {
-                    if(p === 'B') bishops++;
-                    if(p === 'N') knights++;
-                });
-                // King vs King + Bishop
-                if(nonKingPieces.length === 1 && bishops === 1) return true;
-                // King vs King + Knight
-                if(nonKingPieces.length === 1 && knights === 1) return true;
-                // King and Bishop vs King and Bishop with bishops on same color
-                if(nonKingPieces.length === 2 && bishops === 2) {
-                    // Find the squares of the bishops
-                    let bishopSquares = [];
-                    for(let r=0; r<8; r++) {
-                        for(let c=0; c<8; c++) {
-                            const piece = board[r][c];
-                            if(piece && piece.toUpperCase() === 'B') {
-                                bishopSquares.push({row: r, col: c});
-                            }
-                        }
-                    }
-                    if(bishopSquares.length === 2) {
-                        const bishop1Color = (bishopSquares[0].row + bishopSquares[0].col) % 2;
-                        const bishop2Color = (bishopSquares[1].row + bishopSquares[1].col) % 2;
-                        if(bishop1Color === bishop2Color) return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
-        // Handle promotion choice
-        document.querySelectorAll('.promotion-piece').forEach(button => {
-            button.addEventListener('click', function() {
-                if(!pendingPromotionMove) return; // Safety check
-                const piece = button.dataset.piece;
-                const promo = pendingPromotionMove;
-                const color = getPieceColor(promo.piece);
-                let newPiece = '';
-                switch(piece) {
-                    case 'Q': newPiece = color === 'w' ? 'Q' : 'q'; break;
-                    case 'R': newPiece = color === 'w' ? 'R' : 'r'; break;
-                    case 'B': newPiece = color === 'w' ? 'B' : 'b'; break;
-                    case 'N': newPiece = color === 'w' ? 'N' : 'n'; break;
-                }
-                board[promo.to.row][promo.to.col] = newPiece;
-                promotionModal.style.display = 'none';
-
-                // Update the last move in history with promotion
-                promo.notation += ` promotion to ${piece}`;
-                moveHistory[moveHistory.length -1] = promo;
-                historyList.lastChild.textContent = promo.notation;
-
-                // Switch turn
-                currentTurn = currentTurn === 'w' ? 'b' : 'w';
-                updateTurnIndicator();
-                renderBoard();
-
-                // Reset selection and pending promotion
-                pendingPromotionMove = null;
-
-                // Check game state
-                checkGameState();
+        // Remove king-in-check highlight
+        function removeKingHighlight() {
+            document.querySelectorAll('.king-in-check').forEach(square => {
+                square.classList.remove('king-in-check');
             });
-        });
-
-        // Undo move
-        undoBtn.addEventListener('click', function() {
-            if(moveHistory.length === 0) return;
-            const lastMove = moveHistory.pop();
-            undoneMoves.push(lastMove);
-            historyList.removeChild(historyList.lastChild);
-
-            // Revert the move
-            if(lastMove.promotion) {
-                board[lastMove.to.row][lastMove.to.col] = 'P';
-            } else {
-                board[lastMove.from.row][lastMove.from.col] = lastMove.piece;
-                board[lastMove.to.row][lastMove.to.col] = lastMove.captured;
-            }
-
-            // Handle special moves
-            if(lastMove.special === 'en-passant') {
-                const capturedRow = currentTurn === 'w' ? lastMove.to.row + 1 : lastMove.to.row - 1;
-                board[capturedRow][lastMove.to.col] = 'p'; // Assuming captured piece was pawn
-            }
-            if(lastMove.special === 'castling') {
-                if(lastMove.castling === 'kingside') {
-                    const rookFromCol = 5;
-                    const rookToCol = 7;
-                    board[lastMove.to.row][rookToCol] = board[lastMove.to.row][rookFromCol];
-                    board[lastMove.to.row][rookFromCol] = 'R';
-                } else if(lastMove.castling === 'queenside') {
-                    const rookFromCol = 3;
-                    const rookToCol = 0;
-                    board[lastMove.to.row][rookToCol] = board[lastMove.to.row][rookFromCol];
-                    board[lastMove.to.row][rookFromCol] = 'R';
-                }
-            }
-            if(lastMove.special === 'double-pawn-move') {
-                enPassantTarget = {row: (lastMove.from.row + lastMove.to.row) / 2, col: lastMove.to.col};
-            } else {
-                enPassantTarget = null;
-            }
-
-            // Restore castling rights if necessary
-            // Note: This implementation does not track castling rights history. For full functionality, additional tracking is needed.
-
-            // Switch turn back
-            currentTurn = currentTurn === 'w' ? 'b' : 'w';
-            updateTurnIndicator();
-            renderBoard();
-        });
-
-        // Redo move
-        redoBtn.addEventListener('click', function() {
-            if(undoneMoves.length === 0) return;
-            const move = undoneMoves.pop();
-            moveHistory.push(move);
-            historyList.innerHTML += `<li>${move.notation}</li>`;
-
-            // Reapply the move
-            board[move.from.row][move.from.col] = '';
-            board[move.to.row][move.to.col] = move.piece;
-
-            // Handle special moves
-            if(move.special === 'en-passant') {
-                const capturedRow = currentTurn === 'w' ? move.to.row + 1 : move.to.row - 1;
-                board[capturedRow][move.to.col] = '';
-            }
-            if(move.special === 'castling') {
-                if(move.castling === 'kingside') {
-                    const rookFromCol = 7;
-                    const rookToCol = 5;
-                    board[move.to.row][rookToCol] = board[move.to.row][rookFromCol];
-                    board[move.to.row][rookFromCol] = '';
-                } else if(move.castling === 'queenside') {
-                    const rookFromCol = 0;
-                    const rookToCol = 3;
-                    board[move.to.row][rookToCol] = board[move.to.row][rookFromCol];
-                    board[move.to.row][rookFromCol] = '';
-                }
-            }
-            if(move.special === 'double-pawn-move') {
-                enPassantTarget = {row: (move.from.row + move.to.row) / 2, col: move.to.col};
-            } else {
-                enPassantTarget = null;
-            }
-
-            // Switch turn forward
-            currentTurn = currentTurn === 'w' ? 'b' : 'w';
-            updateTurnIndicator();
-            renderBoard();
-        });
-
-        // New Game button
-        newGameBtn.addEventListener('click', function() {
-            resetGame();
-        });
-
-        // Check game state
-        function checkGameState() {
-            // Check for insufficient material
-            if(isInsufficientMaterial()) {
-                alert('Stalemate by insufficient material! The game is a draw.');
-                gameOver = true;
-                return;
-            }
-
-            const color = currentTurn;
-            const kingPos = findKing(board, color);
-            if(!kingPos) {
-                alert((color === 'w' ? 'Black' : 'White') + ' wins by checkmate!');
-                gameOver = true;
-                return;
-            }
-            const inCheck = isSquareAttacked(board, kingPos.row, kingPos.col, color === 'w' ? 'b' : 'w');
-            if(inCheck) {
-                // Check if checkmate
-                const hasMoves = hasAnyMoves(color);
-                if(!hasMoves) {
-                    alert((color === 'w' ? 'White' : 'Black') + ' is in checkmate. ' + (color === 'w' ? 'Black' : 'White') + ' wins!');
-                    gameOver = true;
-                    return;
-                } else {
-                    alert((color === 'w' ? 'White' : 'Black') + ' is in check!');
-                }
-            } else {
-                // Check for stalemate
-                const hasMoves = hasAnyMoves(color);
-                if(!hasMoves) {
-                    alert('Stalemate! The game is a draw.');
-                    gameOver = true;
-                    return;
-                }
-            }
         }
 
         // Check if player has any valid moves
@@ -1545,6 +1113,7 @@
             gameOver = false;
             updateTurnIndicator();
             renderBoard();
+            removeKingHighlight(); // Ensure king highlight is removed
         }
 
         // Check for insufficient material (stalemate)
