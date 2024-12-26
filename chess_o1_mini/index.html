@@ -304,6 +304,10 @@
         let pendingPromotionMove = null; // To store the move awaiting promotion
         let gameOver = false; // Flag to indicate if the game has ended
 
+        // Define history stacks for undo and redo
+        let history = []; // Stack for undo
+        let future = [];  // Stack for redo
+
         // Unicode symbols for pieces
         const pieces = {
             'P': '♙', 'N': '♘', 'B': '♗', 'R': '♖', 'Q': '♕', 'K': '♔',
@@ -425,13 +429,28 @@
             });
         }
 
-        // Function to set status messages to the last move
-        function setStatusToLastMove(message) {
-            if(moveHistory.length === 0) return;
-            const lastMove = moveHistory[moveHistory.length -1];
-            lastMove.status = message;
-            // Update the last list item
-            historyList.lastChild.innerHTML = `${lastMove.notation} <span class="status">(${lastMove.status})</span>`;
+        // Define the game state structure
+        function createGameState() {
+            return {
+                board: JSON.parse(JSON.stringify(board)), // Deep copy of the current board
+                currentTurn: currentTurn,
+                castlingRights: JSON.parse(JSON.stringify(castlingRights)),
+                enPassantTarget: enPassantTarget ? { ...enPassantTarget } : null,
+                moveHistory: moveHistory.map(move => ({ ...move })), // Deep copy of move history
+            };
+        }
+
+        // Refresh the move history display
+        function updateMoveHistoryDisplay() {
+            historyList.innerHTML = ''; // Clear current history list
+            moveHistory.forEach(move => {
+                const li = document.createElement('li');
+                li.innerHTML = move.notation;
+                if (move.status) {
+                    li.innerHTML += ` <span class="status">(${move.status})</span>`;
+                }
+                historyList.appendChild(li);
+            });
         }
 
         // Get valid moves for a piece
@@ -746,6 +765,12 @@
 
         // Make a move
         function makeMove(from, move) {
+            if (gameOver) return;
+
+            // Capture the current game state before making the move
+            history.push(createGameState());
+            future = []; // Clear the redo stack
+
             const piece = board[from.row][from.col];
             const target = board[move.to.row][move.to.col];
             const moveRecord = {
@@ -755,10 +780,9 @@
                 captured: target,
                 special: move.special || null,
                 castling: null,
-                enPassant: null,
                 promotion: null,
                 notation: null,
-                status: null // To store status messages like check, checkmate, etc.
+                color: currentTurn, // Track which player made the move
             };
 
             // Handle special moves
@@ -808,7 +832,7 @@
                 promotionModal.style.display = 'flex';
                 // Store the move that requires promotion
                 pendingPromotionMove = moveRecord;
-                // Do not log the move yet; wait for promotion selection
+                // Do not push to moveHistory yet; wait for promotion selection
                 return;
             }
 
@@ -832,8 +856,7 @@
             // Log move
             moveRecord.notation = `${getAlgebraic(from)} to ${getAlgebraic(move.to)}`;
             moveHistory.push(moveRecord);
-            updateMoveHistory(moveRecord.notation);
-            undoneMoves = [];
+            updateMoveHistoryDisplay();
 
             // Switch turn
             currentTurn = currentTurn === 'w' ? 'b' : 'w';
@@ -841,7 +864,7 @@
 
             renderBoard();
 
-            // Ensure that checkGameState runs after the DOM has updated
+            // Check game state after move
             requestAnimationFrame(checkGameState);
         }
 
@@ -850,14 +873,6 @@
             const file = String.fromCharCode(97 + move.col);
             const rank = 8 - move.row;
             return `${file}${rank}`;
-        }
-
-        // Update move history
-        function updateMoveHistory(notation) {
-            const moveIndex = moveHistory.length; // Current move count
-            const li = document.createElement('li');
-            li.innerHTML = notation;
-            historyList.appendChild(li);
         }
 
         // Handle promotion choice
@@ -877,117 +892,88 @@
                 board[promo.to.row][promo.to.col] = newPiece;
                 promotionModal.style.display = 'none';
 
-                // Update the last move in history with promotion
-                promo.notation += ` promotion to ${piece}`;
-                moveHistory[moveHistory.length -1] = promo;
-                // Update the last list item
-                historyList.lastChild.innerHTML = `${promo.notation}`;
+                // **Create a new moveRecord for the promotion**
+                const promotionMoveRecord = {
+                    from: {row: promo.from.row, col: promo.from.col},
+                    to: {row: promo.to.row, col: promo.to.col},
+                    piece: promo.piece,
+                    captured: promo.captured,
+                    special: promo.special,
+                    castling: promo.castling,
+                    promotion: newPiece, // Set the promoted piece
+                    notation: `${getAlgebraic(promo.from)} to ${getAlgebraic(promo.to)} (${piece} Promotion)`,
+                    color: promo.color,
+                    status: null,
+                };
 
-                // Switch turn
+                // **Push the promotion move to moveHistory**
+                moveHistory.push(promotionMoveRecord);
+                updateMoveHistoryDisplay();
+
+                // **Capture the new game state after promotion**
+                history.push(createGameState());
+
+                // **Clear the redo stack as new move has been made**
+                future = [];
+
+                // **Reset pendingPromotionMove**
+                pendingPromotionMove = null;
+
+                // **Switch turn**
                 currentTurn = currentTurn === 'w' ? 'b' : 'w';
                 updateTurnIndicator();
                 renderBoard();
 
-                // Reset selection and pending promotion
-                pendingPromotionMove = null;
-
-                // Ensure that checkGameState runs after the DOM has updated
+                // **Check game state after promotion**
                 requestAnimationFrame(checkGameState);
             });
         });
 
         // Undo move
         undoBtn.addEventListener('click', function() {
-            if(moveHistory.length === 0) return;
-            const lastMove = moveHistory.pop();
-            undoneMoves.push(lastMove);
-            historyList.removeChild(historyList.lastChild);
+            if(history.length === 0) return;
+            const previousState = history.pop();
+            future.push(createGameState()); // Save current state to redo stack
 
-            // Revert the move
-            if(lastMove.promotion) {
-                board[lastMove.to.row][lastMove.to.col] = 'P';
-            } else {
-                board[lastMove.from.row][lastMove.from.col] = lastMove.piece;
-                board[lastMove.to.row][lastMove.to.col] = lastMove.captured;
-            }
+            // Restore the previous state
+            board = JSON.parse(JSON.stringify(previousState.board));
+            currentTurn = previousState.currentTurn;
+            castlingRights = JSON.parse(JSON.stringify(previousState.castlingRights));
+            enPassantTarget = previousState.enPassantTarget ? { ...previousState.enPassantTarget } : null;
+            moveHistory = previousState.moveHistory.map(move => ({ ...move }));
 
-            // Handle special moves
-            if(lastMove.special === 'en-passant') {
-                const capturedRow = currentTurn === 'w' ? lastMove.to.row + 1 : lastMove.to.row - 1;
-                board[capturedRow][lastMove.to.col] = 'p'; // Assuming captured piece was pawn
-            }
-            if(lastMove.special === 'castling') {
-                if(lastMove.castling === 'kingside') {
-                    const rookFromCol = 5;
-                    const rookToCol = 7;
-                    board[lastMove.to.row][rookToCol] = board[lastMove.to.row][rookFromCol];
-                    board[lastMove.to.row][rookFromCol] = 'R';
-                } else if(lastMove.castling === 'queenside') {
-                    const rookFromCol = 3;
-                    const rookToCol = 0;
-                    board[lastMove.to.row][rookToCol] = board[lastMove.to.row][rookFromCol];
-                    board[lastMove.to.row][rookFromCol] = 'R';
-                }
-            }
-            if(lastMove.special === 'double-pawn-move') {
-                enPassantTarget = {row: (lastMove.from.row + lastMove.to.row) / 2, col: lastMove.to.col};
-            } else {
-                enPassantTarget = null;
-            }
-
-            // Restore castling rights if necessary
-            // Note: This implementation does not track castling rights history. For full functionality, additional tracking is needed.
+            // Update the move history display
+            updateMoveHistoryDisplay();
 
             // Switch turn back
-            currentTurn = currentTurn === 'w' ? 'b' : 'w';
             updateTurnIndicator();
             renderBoard();
 
-            // Ensure that checkGameState runs after the DOM has updated
+            // Check game state after undo
             requestAnimationFrame(checkGameState);
         });
 
         // Redo move
         redoBtn.addEventListener('click', function() {
-            if(undoneMoves.length === 0) return;
-            const move = undoneMoves.pop();
-            moveHistory.push(move);
-            updateMoveHistory(move.notation);
+            if(future.length === 0) return;
+            const nextState = future.pop();
+            history.push(createGameState()); // Save current state to undo stack
 
-            // Reapply the move
-            board[move.from.row][move.from.col] = '';
-            board[move.to.row][move.to.col] = move.piece;
+            // Restore the next state
+            board = JSON.parse(JSON.stringify(nextState.board));
+            currentTurn = nextState.currentTurn;
+            castlingRights = JSON.parse(JSON.stringify(nextState.castlingRights));
+            enPassantTarget = nextState.enPassantTarget ? { ...nextState.enPassantTarget } : null;
+            moveHistory = nextState.moveHistory.map(move => ({ ...move }));
 
-            // Handle special moves
-            if(move.special === 'en-passant') {
-                const capturedRow = currentTurn === 'w' ? move.to.row + 1 : move.to.row - 1;
-                board[capturedRow][move.to.col] = '';
-            }
-            if(move.special === 'castling') {
-                if(move.castling === 'kingside') {
-                    const rookFromCol = 7;
-                    const rookToCol = 5;
-                    board[move.to.row][rookToCol] = board[move.to.row][rookFromCol];
-                    board[move.to.row][rookFromCol] = '';
-                } else if(move.castling === 'queenside') {
-                    const rookFromCol = 0;
-                    const rookToCol = 3;
-                    board[move.to.row][rookToCol] = board[move.to.row][rookFromCol];
-                    board[move.to.row][rookFromCol] = '';
-                }
-            }
-            if(move.special === 'double-pawn-move') {
-                enPassantTarget = {row: (move.from.row + move.to.row) / 2, col: move.to.col};
-            } else {
-                enPassantTarget = null;
-            }
+            // Update the move history display
+            updateMoveHistoryDisplay();
 
             // Switch turn forward
-            currentTurn = currentTurn === 'w' ? 'b' : 'w';
             updateTurnIndicator();
             renderBoard();
 
-            // Ensure that checkGameState runs after the DOM has updated
+            // Check game state after redo
             requestAnimationFrame(checkGameState);
         });
 
@@ -1096,7 +1082,8 @@
         function resetGame() {
             board = JSON.parse(JSON.stringify(initialBoard));
             moveHistory = [];
-            undoneMoves = [];
+            history = [];
+            future = [];
             historyList.innerHTML = '';
             currentTurn = 'w';
             enPassantTarget = null;
