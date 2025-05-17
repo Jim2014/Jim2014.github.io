@@ -233,19 +233,44 @@ try {
         const paintingPromises = [];
         const imageFiles = [];
 
-        // Get all image files from the images directory
+        
         try {
-            const response = await fetch('images/');
-            const text = await response.text();
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(text, 'text/html');
-            const links = doc.querySelectorAll('a');
+            // Get all image files from the images directory
+            // const response = await fetch('images/');
+            // const text = await response.text();
+            // const parser = new DOMParser();
+            // const doc = parser.parseFromString(text, 'text/html');
+            // const links = doc.querySelectorAll('a');
             
-            links.forEach(link => {
-                const fileName = link.getAttribute('href');
-                if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-                    imageFiles.push(`images/${fileName}`);
-                }
+            // links.forEach(link => {
+            //     const fileName = link.getAttribute('href');
+            //     if (fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+            //         imageFiles.push(`images/${fileName}`);
+            //     }
+            // });
+
+            // Hardcoded list of image files
+            const imageFileNames = [
+                'Blossoming Almond Tree, 1890 Vincent van Gogh (1853-1890).jpg',
+                'Composition 8, 1923 Wassily Kandinsky (1866-1944).jpg',
+                'Irises, 1889 Vincent van Gogh (1853-1890).jpg',
+                'Liberty Leading the People, 1830 Eugene Delacroix (1798-1863).jpg',
+                'Mona Lisa (La Gioconda), c.1503-06 Leonardo da Vinci (1452-1519).jpg',
+                'Napoleon Crossing the Alps on 20th May 1800, 1803 Jacques-Louis David (1748-1825).jpg',
+                'Starry Night, 1889 Vincent van Gogh (1853-1890).jpg',
+                'Storm on the Sea of Galilee, 1633 van Rijn Rembrandt (1606-1669).jpg',
+                'The Girl with a Pearl Earring, c.1665-66 Johannes Vermeer, van Delft (1632-1675).jpg',
+                'The Kiss, c.1907 08 Gustav Klimt (1862-1918).jpg',
+                'The Skiff (La Yole), 1875 Pierre-Auguste Renoir (1841-1919).jpg',
+                'The Swing, 1767 Jean-Honore Fragonard (1732-1806).jpg',
+                'Two Sisters (On the Terrace), 1881 Pierre-Auguste Renoir (1841-1919).jpg',
+                'Water Lily Pond, (Symphony in Green), 1899 Claude Monet (1840-1926).jpg',
+                'sun flower.jpg'
+            ];
+
+            // Add full path to each image
+            imageFileNames.forEach(fileName => {
+                imageFiles.push(`images/${fileName}`);
             });
 
             console.log(`Found ${imageFiles.length} image files`);
